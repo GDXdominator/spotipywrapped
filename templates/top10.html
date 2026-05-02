@@ -1,0 +1,38 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Your Top Items</title>
+        <meta name="description" content="Shows you your top Spotify items">
+        <link href="/static/style.css" rel="stylesheet" type="text/css" media="all">
+    </head>
+    <body>
+        <h1>Your Top Items</h1>
+
+        <div id="top10s">
+            <div class="bar top10">
+                <h2>Your Top {{(top_track_names|length, 10)|min}} Artists</h2>
+                {% for i in range(0, (top_10_artists_list|length, 10)|min) %}
+                    <div>
+                        <p>{{i + 1}}. {{top_10_artists_list[i]}}</p>
+                        <img src={{top_10_artists_imgs[i]}}>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="bar top10">
+                <h2>Your Top {{(top_track_names|length, 10)|min}} Songs</h2>
+                {% for i in range(0, (top_track_names|length, 10)|min) %}
+                    <div>
+                        <p>{{i + 1}}. {{top_track_names[i]}}</p>
+                        <img src={{top_track_covers[i]}}>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div id="piecharts">
+            <img class="bar" src="/static/chart1.png">
+            <img class="bar" src="/static/chart2.png">
+        </div>
+    </body>
+</html>

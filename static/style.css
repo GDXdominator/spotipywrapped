@@ -1,0 +1,52 @@
+body {
+    background-color: rgb(25, 25, 25);
+    color: whitesmoke;
+    text-align: center;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    font-size: 1.15w;
+}
+
+#top10s {
+    display: flex;
+    margin-bottom: 10px;
+    max-width: 75%;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 10px;
+}
+
+.bar {
+    background-color: rgba(50, 50, 50, 0.5);
+    border-style: solid;
+    border-width: 2.5px;
+    border-color: rgba(100, 100, 100, 0.75);
+    border-radius: 25px;
+    padding-left: 10px;
+    padding-right: 10px;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+.top10 {
+    min-width: 25%;
+    max-width: 25%;
+}
+
+.top10 img {
+    aspect-ratio: 1 1;
+    max-width: 125px;
+    border-style: solid;
+    border-width: 2pxx;
+    border-color: rgba(75, 75, 75, 0.75);
+}
+
+#piecharts {
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#piecharts img {
+    background-color: rgba(50, 50, 50, 0.5);
+    border-radius: 25px;
+    padding: 10px;
+}
