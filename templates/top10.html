@@ -10,21 +10,21 @@
 
         <div id="top10s">
             <div class="bar top10">
-                <h2>Your Top {{(top_track_names|length, 10)|min}} Artists</h2>
-                {% for i in range(0, (top_10_artists_list|length, 10)|min) %}
+                <h2>Your Top {{(top_artists|length, 10)|min}} Artists</h2>
+                {% for i in range(0, (top_artists|length, 10)|min) %}
                     <div>
-                        <p>{{i + 1}}. {{top_10_artists_list[i]}}</p>
-                        <img src={{top_10_artists_imgs[i]}}>
+                        <p>{{i + 1}}. {{top_artists[i][0]}}</p>
+                        <img src={{top_artists[i][1]}}>
                     </div>
                 {% endfor %}
             </div>
 
             <div class="bar top10">
-                <h2>Your Top {{(top_track_names|length, 10)|min}} Songs</h2>
-                {% for i in range(0, (top_track_names|length, 10)|min) %}
+                <h2>Your Top {{(top_tracks|length, 10)|min}} Songs</h2>
+                {% for i in range(0, (top_tracks|length, 10)|min) %}
                     <div>
-                        <p>{{i + 1}}. {{top_track_names[i]}}</p>
-                        <img src={{top_track_covers[i]}}>
+                        <p>{{i + 1}}. {{top_tracks[i][0]}}</p>
+                        <img src={{top_tracks[i][1]}}>
                     </div>
                 {% endfor %}
             </div>
@@ -34,5 +34,12 @@
             <img class="bar" src="/static/chart1.png">
             <img class="bar" src="/static/chart2.png">
         </div>
+
+        <button id="to_avg_data">Next</button>
+        <script>
+            document.getElementById("to_avg_data").addEventListener("click", function() {
+                window.location.href = "templates/avg_data.html"
+            })
+        </script>
     </body>
 </html>

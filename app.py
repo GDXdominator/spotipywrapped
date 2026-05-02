@@ -3,6 +3,9 @@ from flask import Flask, request, render_template
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
+# Data saved as tsv in the event an item has ',' in its name
+# (Learned that the hard way trying to store "Tyler, the Creator")
+import csv
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -14,6 +17,9 @@ recco_headers = {
     'Accept': 'application/json'
 }
 
+time_range = "medium_term"
+track_limit = 10
+
 app = Flask(__name__)
 
 @app.route('/')
@@ -22,9 +28,12 @@ def home():
 
 @app.route('/top10', methods=['GET', 'POST'])
 def top10():
+    # DATA PROCESSING
+
     CLIENT_ID = request.args.get('client_id')
     CLIENT_SECRET = request.args.get('client_secret')
     REDIRECT_URI = request.args.get('redirect_uri')
+
     time_range = request.args.get('time_range')
     track_limit = request.args.get('track_limit')
 
@@ -37,20 +46,43 @@ def top10():
     sp = spotipy.Spotify(auth_manager=auth_manager)
 
     top_artists = sp.current_user_top_artists(limit=track_limit, time_range=time_range)['items']
-    top_10_artists_list = []
-    top_10_artists_imgs = []
+    data = []
     for artist in top_artists:
-        top_10_artists_list.append(artist['name'])
-        top_10_artists_imgs.append(artist['images'][0]['url'])
+        data.append([artist['name'], artist['images'][0]['url']])
+    with open('data/top_artists.tsv', 'w', newline='') as file:
+        writer = csv.writer(file, delimiter='\t')
+        writer.writerows(data)
 
     top_tracks = sp.current_user_top_tracks(limit=track_limit, time_range=time_range)['items']
-    top_track_names = []
-    top_track_covers = []
-
-    saved_tracks = sp.current_user_saved_tracks(limit=track_limit)['items']
-    all_tracks = []
+    data = []
+    for track in top_tracks:
+        data.append([track['artists'][0]['name'] + ' - ' + track['name'], track['album']['images'][0]['url']])
+    with open('data/top_tracks.tsv', 'w', newline='') as file:
+        writer = csv.writer(file, delimiter='\t')
+        writer.writerows(data)
+    
+    avg_info = {
+        'acousticness': 0,
+        'danceability': 0,
+        'energy': 0,
+        'instrumentalness': 0,
+        'loudness': 0,
+        'tempo': 0,
+        'valence': 0,
+        'duration_ms': 0,
+        'popularity': 0,
+    }
+    years = []
     artist_appearances = {}
     top_track_artist_appearances = {}
+
+    total_tracks_with_data = 0
+    albums_with_popularity_data = 0
+
+    top_tracks = sp.current_user_top_tracks(limit=track_limit, time_range=time_range)['items']
+    saved_tracks = sp.current_user_saved_tracks(limit=track_limit)['items']
+    all_tracks = []
+
     for track_item in saved_tracks:
         all_tracks.append(track_item['track'])
     for track in top_tracks:
@@ -60,12 +92,73 @@ def top10():
             top_track_artist_appearances[artist] += 1
         else:
             top_track_artist_appearances[artist] = 1
+
     for track in all_tracks:
+        audio_features = get_audio_features(track['id'])
+        if audio_features != None:
+            total_tracks_with_data += 1
+            avg_info['duration_ms'] += track['duration_ms']
+            years.append(int(track['album']['release_date'][:4]))
+            for audio_feature in audio_features:
+                if audio_feature in avg_info:
+                    avg_info[audio_feature] += audio_features[audio_feature]
+        
+        popularity = get_album_popularity(track['album']['id'])
+        avg_info['popularity'] += popularity
+        albums_with_popularity_data += 1 if popularity != 0 else 0
+
         artist = track['artists'][0]['name']
         if artist in artist_appearances:
             artist_appearances[artist] += 1
         else:
             artist_appearances[artist] = 1
+
+    for info in avg_info:
+        if info == 'popularity':
+            continue
+        avg_info[info] /= total_tracks_with_data
+    avg_info['popularity'] /= albums_with_popularity_data
+
+    with open('data/avg_data.tsv', 'w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=list(avg_info.keys()), delimiter='\t')
+        writer.writeheader()
+        writer.writerows([avg_info])
+
+    with open('data/years_listened.txt', 'w') as file:
+        for year in years:
+            file.write(str(year) + '\n')
+
+    with open('data/artist_appearances.tsv', 'w', newline='') as file:
+        data = []
+        for artist in artist_appearances:
+            data.append({
+                'Artist': artist,
+                'Top Songs/Likes Appearances': artist_appearances[artist],
+                "Top Songs Appearances": top_track_artist_appearances[artist] if artist in top_track_artist_appearances else 0
+            })
+        fieldnames = ["Artist", "Top Songs/Likes Appearances", "Top Songs Appearances"]
+        writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='\t')
+        writer.writerows(data)
+    
+    # DATA GATHERING
+
+    artist_appearances = []
+    with open('data/artist_appearances.tsv', 'r') as file:
+        for line in file:
+            line_split = line.split('\t')
+            artist_appearances.append(line_split)
+
+    top_artists = []
+    with open('data/top_artists.tsv', 'r') as file:
+        for line in file:
+            line_split = line.split('\t')
+            top_artists.append(line_split)
+    
+    top_tracks = []
+    with open('data/top_tracks.tsv') as file:
+        for line in file:
+            line_split = line.split('\t')
+            top_tracks.append(line_split)
 
     labels = []
     sizes = []
@@ -79,9 +172,9 @@ def top10():
 
     # Chart 1
 
-    for artist in artist_appearances:
-        sizes.append(artist_appearances[artist])
-        labels.append(artist)
+    for info in artist_appearances:
+        sizes.append(int(info[1]))
+        labels.append(info[0])
     greatest_slice = max(sizes)
     max_i = sizes.index(greatest_slice)
     explode_val = tuple([0 if i != max_i else 0.2 for i in range(len(sizes))])
@@ -105,9 +198,9 @@ def top10():
 
     labels = []
     sizes = []
-    for artist in top_track_artist_appearances:
-        sizes.append(top_track_artist_appearances[artist])
-        labels.append(artist)
+    for info in artist_appearances:
+        sizes.append(int(info[2]))
+        labels.append(info[0])
     greatest_slice = max(sizes)
     max_i = sizes.index(greatest_slice)
     explode_val = tuple([0 if i != max_i else 0.2 for i in range(len(sizes))])
@@ -127,11 +220,168 @@ def top10():
     title.set_color('white')
     plt.savefig('static/chart2.png', transparent=True)
 
-    for track in top_tracks:
-        top_track_names.append(track['artists'][0]['name'] + ' - ' + track['name'])
-        top_track_covers.append(track['album']['images'][0]['url'])
+    return render_template('top10.html', top_artists=top_artists, top_tracks=top_tracks)
 
-    return render_template('top10.html', top_10_artists_list=top_10_artists_list, top_10_artists_imgs=top_10_artists_imgs, top_track_names=top_track_names, top_track_covers=top_track_covers)
+@app.route('/avg_data')
+def avg_data():
+    avg_info = {}
+    with open('data/avg_data.txt', 'r') as file:
+        for line in file:
+            line_split = line.split('\t')
+            avg_info[line_split[0]] = float(line_split[1])
+
+    years = []
+    with open('data/years.txt', 'r') as file:
+        for line in file:
+            years.append(int(line))
+
+    responses = {}
+
+    acousticness = avg_info['acousticness']
+    if acousticness < 0.5:
+        responses['acousticness'] = "You seem to like music with electronic, digital, or amplified elements the best!"
+    elif acousticness < 0.8:
+        responses['acousticness'] = "Your music seems to be in between electronic/digital and acoustic"
+    else:
+        responses['acousticness'] = "Seems you have a preference for purely acoustic music!"
+
+    danceability = avg_info['danceability']
+    if danceability < 0.4:
+        responses['danceability'] = "Your songs seems hard to dance to..."
+    elif danceability < 0.65:
+        responses['danceability'] = "If you try very hard, you <i>might</i> be able to dance to your songs..."
+    elif danceability < 0.8:
+        responses['danceability'] = "Your songs are great to dance to!"
+    else:
+        responses['danceability'] = "Your songs were made to be danced to!"
+
+    energy = avg_info['energy']
+    if energy < 0.3:
+        responses['energy'] = "You don't seem to be the energetic type"
+    elif energy < 0.55:
+        responses['energy'] = "There's slight energy in the music you listen to..."
+    elif energy < 0.8:
+        responses['energy'] = "Your music is fairly energetic!"
+    else:
+        responses['energy'] = "Your music is very energetic!"
+
+    instrumentalness = avg_info['instrumentalness']
+    if instrumentalness < 0.3:
+        responses['instrumentalness'] = "Either you're fan of clear rap or big on singing. You love to be able to hear vocals!"
+    elif instrumentalness < 0.5:
+        responses['instrumentalness'] = "Most of your favorite vocalists don't seem to be speaking clearly enough, are shouting or screaming, or are buried under the instruments"
+    elif instrumentalness < 0.7:
+        responses['instrumentalness'] = "Either most of your favorite vocalists are incomprehensible or you prefer to listen to instrumental music"
+    else:
+        responses['instrumentalness'] = "You much prefer instrumental music. Instruments over the voice!"
+
+    loudness = avg_info['loudness']
+    if loudness < -25:
+        responses['loudness'] = "Your music is very quiet... Perhaps a fan of ambient or calming music?"
+    elif loudness < -15:
+        responses['loudness'] = "Your music is quiet quiet. You love calming music, but not pure ambience"
+    elif loudness < -10:
+        responses['loudness'] = "Your music is at a fair volume"
+    elif loudness < -7:
+        responses['loudness'] = "You like your music fairly loud!"
+    elif loudness < -5:
+        responses['loudness'] = "You like it loud!! Most likely a rock, metal, or EDM fan!"
+    else:
+        responses['loudness'] = "You like it really loud!!! Most definitely a fan of metal, hardcore EDM, or maybe even noise music!"
+
+    tempo = avg_info['tempo']
+    if tempo < 60:
+        responses['tempo'] = "Most of your top songs are slower than a clock ticking!"
+    elif tempo < 109:
+        responses['tempo'] = "Your top songs are fairly slow"
+    elif tempo < 120:
+        responses['tempo'] = "Your top songs are at a fairly normal tempo"
+    elif tempo < 158:
+        responses['tempo'] = "Your top songs are fairly upbeat and fast!"
+    elif tempo < 180:
+        responses['tempo'] = "You like your songs quite fast and lively!"
+    else:
+        responses['tempo'] = "You like your songs really fast!"
+
+    time_range_responses = {
+        "short_term": "The past week has been ",
+        "medium_term": "The past 6 months have been ",
+        "long_term": "The past year has been "
+    }
+    time_range_response = time_range_responses[time_range]
+    valence = avg_info['valence']
+    if valence < 0.25:
+        responses['valence'] = time_range_response + "very unkind to you. Whatever emotions your top songs have, they definitely aren't happiness"
+    elif valence < 0.5:
+        responses['valence'] = time_range_response + "alright. Your top songs don't seem incredibly happy"
+    elif valence < 0.75:
+        responses['valence'] = time_range_response + "average, it seems. Your top songs don't seem too sad or dark, but not incredibly happy"
+    else:
+        responses['valence'] = time_range_response + "pretty good! Your top songs seem to be pretty happy and positive"
+
+    duration_m = avg_info['duration_ms'] / 60000
+    if duration_m < 1.5:
+        responses['duration_m'] = "Most of your favorite tracks aren't even a minute long... You are absolutely a grindcore fan or are listening to sound effects."
+    elif duration_m < 4.5:
+        responses['duration_m'] = "Nothing much to say here, this is a fairly normal length for a song"
+    elif duration_m < 8:
+        responses['duration_m'] = "You like long songs, but not too long, I see"
+    elif duration_m < 12:
+        responses['duration_m'] = "Your in for the long run!"
+    else:
+        responses['duration_m'] = "Your music must send you in a trance if they go on for this long..."
+
+    popularity = avg_info['popularity']
+    if popularity < 0.1:
+        responses['popularity'] = "You are deep underground, no one knows your songs!"
+    elif popularity < 0.25:
+        responses['popularity'] = "Most of your music is quite underground"
+    elif popularity < 0.5:
+        responses['popularity'] = "Your top songs may be popular in specific spaces, but not quite mainstream"
+    elif popularity < 0.8:
+        responses['popularity'] = "Your top songs are popular, but not mainstream!"
+    else:
+        responses['popularity'] = "Your top songs are known by the masses!"
+
+    for info in avg_info:
+        avg_info[info] = float(np.round(avg_info[info]), 3)
+        info.capitalize()
+
+    eras = {
+        (0, 1919): 0,
+        (1920, 1949): 0,
+        (1950, 1969): 0,
+        (1970, 1979): 0,
+        (1980, 1989): 0,
+        (1990, 1999): 0,
+        (2000, 2009): 0,
+        (2010, 2015): 0,
+        (2016, 2019): 0,
+        (2020, 2021): 0,
+        (2022, 2026): 0
+    }
+    eras_responses = {
+        (0, 1919): "You are a dinosaur.",
+        (1920, 1949): "You are a great grandparent. Did you live through the Great Depression or WW1?",
+        (1950, 1969): "You have an old soul",
+        (1970, 1979): "You have a 70s soul",
+        (1980, 1989): "You have an 80s soul",
+        (1990, 1999): "You have a 90s soul",
+        (2000, 2009): "You have a 2000s soul",
+        (2010, 2015): "You yearn for the early 2000s",
+        (2016, 2019): "You yearn for the late 2000s",
+        (2020, 2021): "You are quite fond of pandemic music",
+        (2022, 2026): "You're in for the new! Your music taste is quite recent"
+    }
+    for year in years:
+        for era in eras:
+            if year >= era[0] and year <= era[1]:
+                eras[era] += 1
+    most_listened_era = max(eras, key=eras.get)
+    avg_info['Most Listened Era'] = f"{most_listened_era[0] - most_listened_era[1]}"
+    responses['years'] = eras_responses[most_listened_era]
+
+    render_template('avg_data.html', avg_info=avg_info, responses=responses)
 
 def get_audio_features(id):
     url = "https://api.reccobeats.com/v1/audio-features?ids=" + id
