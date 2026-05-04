@@ -24,7 +24,6 @@
             <label for="track_limit">Track Limit:</label>
             <input type="range" id="track_limit" name="track_limit" min="5" max="50">
             <p id="track_limit_value">27</p>
-            <br><br>
 
             <label for="time_range">Time range:</label>
             <select id="time_range" name="time_range">
@@ -32,6 +31,10 @@
                 <option value='medium_term'>Past 6 months</option>
                 <option value='long_term'>Past year</option>
             </select>
+            <br><br>
+
+            <label for="include_liked">Include Liked Songs in Average Data</label>
+            <input type="checkbox" id="include_liked" name="include_liked">
             <br><br>
 
             <input type="submit" id="submit" value="Submit">

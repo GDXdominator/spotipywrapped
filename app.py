@@ -27,13 +27,13 @@ def home():
 
 @app.route('/top10', methods=['POST'])
 def top10():
-    # DATA PROCESSING
     CLIENT_ID = request.form.get('client_id')
     CLIENT_SECRET = request.form.get('client_secret')
     REDIRECT_URI = request.form.get('redirect_uri')
 
     track_limit = request.form.get('track_limit')
     time_range = request.form.get('time_range')
+    include_liked = request.form.get('include_liked')
 
     auth_manager = SpotifyOAuth(
         client_id=CLIENT_ID,
@@ -97,6 +97,8 @@ def top10():
     album_appearances = {}
 
     def set_score(field, value, track):
+        if not include_liked and track not in top_tracks:
+            return
         track_info = [track['artists'][0]['name'] + ' - ' + track['name'], track['album']['images'][0]['url']]
         lowest_score = song_scores[field][1]
         highest_score = song_scores[field][3]
@@ -111,6 +113,7 @@ def top10():
     for field in avg_info:
         if isinstance(avg_info[field], int):
             song_scores[field] = ["Lowest scoring song", 9999999999, "Highest scoring song", -9999999999]
+    song_scores['years'] = ["Lowest scoring song", 9999999999, "Highest scoring song", -9999999999]
 
     total_tracks_with_data = 0
     albums_with_popularity_data = 0
@@ -118,6 +121,9 @@ def top10():
     top_tracks = sp.current_user_top_tracks(limit=track_limit, time_range=time_range)['items']
     saved_tracks = sp.current_user_saved_tracks(limit=track_limit)['items']
     all_tracks = []
+
+    if len(top_tracks) == 0:
+        return render_template('home.html', msg="You have no top tracks, get to listening!")
 
     print("Current user's top and saved tracks gathered")
 
@@ -151,20 +157,21 @@ def top10():
 
     for track in all_tracks:
         audio_features = get_audio_features(track['id'])
-        if audio_features != None:
-            total_tracks_with_data += 1
+        if (track in all_tracks and include_liked) or track in top_tracks:
+            if audio_features != None:
+                total_tracks_with_data += 1
 
-            avg_info['duration_ms'] += track['duration_ms']
-            set_score('duration_ms', track['duration_ms'], track)
+                avg_info['duration_ms'] += track['duration_ms']
+                set_score('duration_ms', track['duration_ms'], track)
 
-            years.append(int(track['album']['release_date'][:4]))
-            for audio_feature in audio_features:
-                if audio_feature in avg_info:
-                    value = audio_features[audio_feature]
-                    avg_info[audio_feature] += value
-                    set_score(audio_feature, value, track)
-
-            print(f"Gathered audio features of {total_tracks_with_data}/{len(all_tracks)} songs")
+                release_year = int(track['album']['release_date'][:4])
+                years.append(release_year)
+                set_score('years', release_year, track)
+                for audio_feature in audio_features:
+                    if audio_feature in avg_info:
+                        value = audio_features[audio_feature]
+                        avg_info[audio_feature] += value
+                        set_score(audio_feature, value, track)
         
         popularity = get_album_popularity(track['album']['id'])
         avg_info['popularity'] += popularity
@@ -177,6 +184,8 @@ def top10():
             artist_appearances[artist] += 1
         else:
             artist_appearances[artist] = 1
+        
+        print(f"Gathered data of {total_tracks_with_data}/{len(all_tracks)} songs")
 
     for info in avg_info:
         if total_tracks_with_data == 0:
@@ -262,26 +271,38 @@ def top10():
     radius = 1.25
     legend_xOffset = -0.5
     title_yOffset = 1.1
+    fontsize = 8
 
     # Chart 1
 
     for info in artist_appearances:
         sizes.append(int(info[1]))
         labels.append(info[0])
+
+    colors = []
+    sub_value = 215 / len(labels)
+    for i in range(0, len(labels)):
+        col_val = (215 - sub_value * i) / 255
+        colors.append((30/255, col_val, 96/255))
+
     greatest_slice = max(sizes)
     max_i = sizes.index(greatest_slice)
     explode_val = tuple([0 if i != max_i else 0.2 for i in range(len(sizes))])
 
     _, ax = plt.subplots(figsize=figsize)
-    wedges, _, autotexts = ax.pie(sizes, autopct=percent_to_int, explode=explode_val, radius=radius)
+    wedges, _, autotexts = ax.pie(sizes, autopct=percent_to_int, explode=explode_val, radius=radius, textprops={'fontsize': fontsize}, colors=colors)
     for txt in autotexts:
         txt.set_color('white')
 
-    leg = ax.legend(wedges, labels, title='Artists (Counterclockwise)', loc='center left', fontsize=8)
+    leg = ax.legend(wedges, labels, title='Artists (Counterclockwise)', loc='center left', fontsize=fontsize)
     bb = leg.get_bbox_to_anchor().transformed(ax.transAxes.inverted())
     bb.x0 += legend_xOffset
     bb.x1 += legend_xOffset
     leg.set_bbox_to_anchor(bb, transform=ax.transAxes)
+    leg_frame = leg.get_frame()
+    leg_frame.set_facecolor((0.5, 0.5, 0.5))
+    for text in leg.get_texts():
+        text.set_color('white')
 
     title = ax.set_title(f"Artist appearances in top + past liked {int(track_limit) * 2} tracks", y=title_yOffset)
     title.set_color('white')
@@ -296,20 +317,31 @@ def top10():
             continue
         sizes.append(int(info[2]))
         labels.append(info[0])
+
+    colors = []
+    sub_value = 215 / len(labels)
+    for i in range(0, len(labels)):
+        col_val = (215 - sub_value * i) / 255
+        colors.append((30/255, col_val, 96/255))
+
     greatest_slice = max(sizes)
     max_i = sizes.index(greatest_slice)
     explode_val = tuple([0 if i != max_i else 0.2 for i in range(len(sizes))])
 
     _, ax = plt.subplots(figsize=figsize)
-    wedges, _, autotexts = ax.pie(sizes, autopct=percent_to_int, explode=explode_val, radius=radius, textprops={'fontsize': 8})
+    wedges, _, autotexts = ax.pie(sizes, autopct=percent_to_int, explode=explode_val, radius=radius, textprops={'fontsize': fontsize}, colors=colors)
     for txt in autotexts:
         txt.set_color('white')
     
-    leg = ax.legend(wedges, labels, title='Artists (Counterclockwise)', loc='center left', fontsize=8)
+    leg = ax.legend(wedges, labels, title='Artists (Counterclockwise)', loc='center left', fontsize=fontsize)
     bb = leg.get_bbox_to_anchor().transformed(ax.transAxes.inverted())
     bb.x0 += legend_xOffset
     bb.x1 += legend_xOffset
     leg.set_bbox_to_anchor(bb, transform=ax.transAxes)
+    leg_frame = leg.get_frame()
+    leg_frame.set_facecolor((0.5, 0.5, 0.5))
+    for text in leg.get_texts():
+        text.set_color('white')
 
     title = ax.set_title('Artist appearances in top ' + str(track_limit) + ' tracks', y=title_yOffset)
     title.set_color('white')
@@ -472,7 +504,7 @@ def avg_data():
             if year >= era[0] and year <= era[1]:
                 eras[era] += 1
     most_listened_era = max(eras, key=eras.get)
-    avg_info['years'] = [f"{most_listened_era[0]} - {most_listened_era[1]}", " period"]
+    avg_info['years'] = [f"{most_listened_era[0]} - {most_listened_era[1]}", ""]
     responses['years'] = eras_responses[most_listened_era]
 
     avg_info['duration_m'] = [ms_to_m(avg_info['duration_ms'][0]), ' ' + avg_info['duration_ms'][1]]
@@ -496,8 +528,9 @@ def avg_data():
         'loudness': ("Quietest song", "Loudest song"),
         'tempo': ("Slowest song", "Fastest song"),
         'valence': ("Least happy", "Brightest"),
-        'duration_ms': ("Shortest song", "Longest song"),
-        'popularity': ("Least popular", "Most popular")
+        'duration_m': ("Shortest song", "Longest song"),
+        'popularity': ("Least popular", "Most popular"),
+        'years': ("Oldest song", "Newest song")
     }
     with open('data/song_scores.tsv', 'r') as file:
         for line in file:
@@ -522,6 +555,7 @@ def avg_data():
             elif field == 'duration_ms':
                 low_score = ms_to_m(float(low_score))
                 high_score = ms_to_m(float(high_score))
+                field = 'duration_m'
 
             if isinstance(low_score, float):
                 low_score = str(float(np.round(low_score, 2)))
