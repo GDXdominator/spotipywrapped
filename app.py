@@ -273,42 +273,42 @@ def top10():
     title_yOffset = 1.1
     fontsize = 8
 
-    # Chart 1
+    def draw_chart(sizes, labels, title):
+        colors = []
+        sub_value = 215 / len(labels)
+        for i in range(0, len(labels)):
+            col_val = (215 - sub_value * i) / 255
+            colors.append((30/255, col_val, 96/255))
+
+        greatest_slice = max(sizes)
+        max_i = sizes.index(greatest_slice)
+        explode_val = tuple([0 if i != max_i else 0.2 for i in range(len(sizes))])
+
+        _, ax = plt.subplots(figsize=figsize)
+        wedges, _, autotexts = ax.pie(sizes, autopct=percent_to_int, explode=explode_val, radius=radius, textprops={'fontsize': fontsize}, colors=colors)
+        for txt in autotexts:
+            txt.set_color('white')
+        
+        leg = ax.legend(wedges, labels, title='Artists (Counterclockwise)', loc='center left', fontsize=fontsize)
+        bb = leg.get_bbox_to_anchor().transformed(ax.transAxes.inverted())
+        bb.x0 += legend_xOffset
+        bb.x1 += legend_xOffset
+        leg.set_bbox_to_anchor(bb, transform=ax.transAxes)
+        leg_frame = leg.get_frame()
+        leg_frame.set_facecolor((0.25, 0.25, 0.25))
+        leg.get_title().set_color((0.95, 0.95, 0.95))
+        for text in leg.get_texts():
+            text.set_color('white')
+
+        title = ax.set_title(title, y=title_yOffset)
+        title.set_color('white')
 
     for info in artist_appearances:
         sizes.append(int(info[1]))
         labels.append(info[0])
 
-    colors = []
-    sub_value = 215 / len(labels)
-    for i in range(0, len(labels)):
-        col_val = (215 - sub_value * i) / 255
-        colors.append((30/255, col_val, 96/255))
-
-    greatest_slice = max(sizes)
-    max_i = sizes.index(greatest_slice)
-    explode_val = tuple([0 if i != max_i else 0.2 for i in range(len(sizes))])
-
-    _, ax = plt.subplots(figsize=figsize)
-    wedges, _, autotexts = ax.pie(sizes, autopct=percent_to_int, explode=explode_val, radius=radius, textprops={'fontsize': fontsize}, colors=colors)
-    for txt in autotexts:
-        txt.set_color('white')
-
-    leg = ax.legend(wedges, labels, title='Artists (Counterclockwise)', loc='center left', fontsize=fontsize)
-    bb = leg.get_bbox_to_anchor().transformed(ax.transAxes.inverted())
-    bb.x0 += legend_xOffset
-    bb.x1 += legend_xOffset
-    leg.set_bbox_to_anchor(bb, transform=ax.transAxes)
-    leg_frame = leg.get_frame()
-    leg_frame.set_facecolor((0.5, 0.5, 0.5))
-    for text in leg.get_texts():
-        text.set_color('white')
-
-    title = ax.set_title(f"Artist appearances in top + past liked {int(track_limit) * 2} tracks", y=title_yOffset)
-    title.set_color('white')
+    draw_chart(sizes, labels, f"Artist appearances in top + past liked {int(track_limit) * 2} tracks")
     plt.savefig('static/chart1.png', transparent=True)
-
-    # Chart 2
 
     labels = []
     sizes = []
@@ -318,33 +318,7 @@ def top10():
         sizes.append(int(info[2]))
         labels.append(info[0])
 
-    colors = []
-    sub_value = 215 / len(labels)
-    for i in range(0, len(labels)):
-        col_val = (215 - sub_value * i) / 255
-        colors.append((30/255, col_val, 96/255))
-
-    greatest_slice = max(sizes)
-    max_i = sizes.index(greatest_slice)
-    explode_val = tuple([0 if i != max_i else 0.2 for i in range(len(sizes))])
-
-    _, ax = plt.subplots(figsize=figsize)
-    wedges, _, autotexts = ax.pie(sizes, autopct=percent_to_int, explode=explode_val, radius=radius, textprops={'fontsize': fontsize}, colors=colors)
-    for txt in autotexts:
-        txt.set_color('white')
-    
-    leg = ax.legend(wedges, labels, title='Artists (Counterclockwise)', loc='center left', fontsize=fontsize)
-    bb = leg.get_bbox_to_anchor().transformed(ax.transAxes.inverted())
-    bb.x0 += legend_xOffset
-    bb.x1 += legend_xOffset
-    leg.set_bbox_to_anchor(bb, transform=ax.transAxes)
-    leg_frame = leg.get_frame()
-    leg_frame.set_facecolor((0.5, 0.5, 0.5))
-    for text in leg.get_texts():
-        text.set_color('white')
-
-    title = ax.set_title('Artist appearances in top ' + str(track_limit) + ' tracks', y=title_yOffset)
-    title.set_color('white')
+    draw_chart(sizes, labels, 'Artist appearances in top ' + str(track_limit) + ' tracks')
     plt.savefig('static/chart2.png', transparent=True)
 
     return render_template('top10.html', top_artists=top_artists, top_albums=top_albums, top_tracks=top_tracks)
