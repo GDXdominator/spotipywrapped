@@ -15,9 +15,6 @@ recco_headers = {
     'Accept': 'application/json'
 }
 
-time_range = "medium_term"
-track_limit = 10
-
 app = Flask(__name__)
 
 @app.route('/', methods=['GET', 'POST'])
@@ -34,6 +31,11 @@ def top10():
     track_limit = request.form.get('track_limit')
     time_range = request.form.get('time_range')
     include_liked = request.form.get('include_liked')
+
+    avg_data_filters = {}
+
+    avg_data_filters['time_range'] = time_range
+    avg_data_filters['include_liked'] = include_liked
 
     auth_manager = SpotifyOAuth(
         client_id=CLIENT_ID,
@@ -144,6 +146,8 @@ def top10():
             album_appearances[str_rep][0] += 1
         else:
             album_appearances[str_rep] = [1, album['images'][0]['url']]
+    all_tracks_no_dupes = []
+    [all_tracks_no_dupes.append(track) for track in all_tracks if track not in all_tracks_no_dupes]
 
     sorted_dict = {key: val for key, val in sorted(album_appearances.items(), key=lambda item: item[1][0], reverse=True)}
     data = []
@@ -155,9 +159,9 @@ def top10():
 
     print("top_albums.tsv written")
 
-    for track in all_tracks:
+    for track in all_tracks_no_dupes:
         audio_features = get_audio_features(track['id'])
-        if (track in all_tracks and include_liked) or track in top_tracks:
+        if (track in all_tracks_no_dupes and include_liked) or track in top_tracks:
             if audio_features != None:
                 total_tracks_with_data += 1
 
@@ -185,7 +189,11 @@ def top10():
         else:
             artist_appearances[artist] = 1
         
-        print(f"Gathered data of {total_tracks_with_data}/{len(all_tracks)} songs")
+        print(f"Gathered audio features of {total_tracks_with_data}/{len(all_tracks_no_dupes)} songs")
+
+    avg_data_filters['total_tracks_with_data'] = total_tracks_with_data
+    with open('data/avg_data_filters.json', 'w') as file:
+        json.dump(avg_data_filters, file)
 
     for info in avg_info:
         if total_tracks_with_data == 0:
@@ -274,18 +282,27 @@ def top10():
     fontsize = 8
 
     def draw_chart(sizes, labels, title):
+        '''
         colors = []
         sub_value = 215 / len(labels)
         for i in range(0, len(labels)):
             col_val = (215 - sub_value * i) / 255
             colors.append((30/255, col_val, 96/255))
+        '''
 
         greatest_slice = max(sizes)
         max_i = sizes.index(greatest_slice)
         explode_val = tuple([0 if i != max_i else 0.2 for i in range(len(sizes))])
 
         _, ax = plt.subplots(figsize=figsize)
-        wedges, _, autotexts = ax.pie(sizes, autopct=percent_to_int, explode=explode_val, radius=radius, textprops={'fontsize': fontsize}, colors=colors)
+        wedges, _, autotexts = ax.pie(
+            sizes,
+            autopct=percent_to_int,
+            explode=explode_val,
+            radius=radius,
+            textprops={'fontsize': fontsize},
+            wedgeprops={'edgecolor': (0.05, 0.05, 0.05), 'linewidth': 0.5}
+        )
         for txt in autotexts:
             txt.set_color('white')
         
@@ -307,7 +324,7 @@ def top10():
         sizes.append(int(info[1]))
         labels.append(info[0])
 
-    draw_chart(sizes, labels, f"Artist appearances in top + past liked {int(track_limit) * 2} tracks")
+    draw_chart(sizes, labels, f"Artist appearances in top + past liked {len(all_tracks_no_dupes)} tracks")
     plt.savefig('static/chart1.png', transparent=True)
 
     labels = []
@@ -340,6 +357,9 @@ def avg_data():
             years.append(int(line))
 
     responses = {}
+
+    with open('data/avg_data_filters.json', 'r') as file:
+        avg_data_filters = json.load(file)
 
     acousticness = avg_info['acousticness'][0]
     if acousticness < 0.5:
@@ -409,11 +429,11 @@ def avg_data():
 
     valence = avg_info['valence'][0]
     time_range_responses = {
-        "short_term": "The past week has been ",
+        "short_term": "The past month has been ",
         "medium_term": "The past 6 months have been ",
         "long_term": "The past year has been "
     }
-    time_range_response = time_range_responses[time_range]
+    time_range_response = time_range_responses[avg_data_filters['time_range']]
     if valence < 0.25:
         responses['valence'] = time_range_response + "very unkind to you. Whatever emotions your top songs have, they definitely aren't happiness"
     elif valence < 0.5:
@@ -512,7 +532,7 @@ def avg_data():
             field = line_split[0]
             if line_split[1][0] != '"':
                 low_score_track_info = eval(line_split[1])
-            else: # weird bug where tracks w/ apostrophes get formatted in the tsv like "[""track name"", ...]"
+            else: # weird thing where tracks w/ apostrophes get formatted in the tsv like "[""track name"", ...]"
                 low_score_track_info = eval(line_split[1].strip('"').replace('""', '"'))
             low_score = line_split[2]
             if line_split[3][0] != '"':
@@ -542,7 +562,20 @@ def avg_data():
     
     avg_info.pop('duration_ms')
 
-    return render_template('avg_data.html', avg_info=avg_info, responses=responses, song_scores=song_scores)
+    include_liked = avg_data_filters['include_liked']
+    total_tracks = len(years)
+    total_tracks_with_data = avg_data_filters['total_tracks_with_data']
+
+    heading = f"Average value of your top and liked songs" if include_liked else f"Average value of your top songs"
+    disclaimer = f"Of the {total_tracks} songs gathered, {total_tracks_with_data} ({int(np.round(total_tracks_with_data / total_tracks * 100))}%) had audio features available"
+
+    field_images = {}
+    with open('static/value_images.tsv') as file:
+        for line in file:
+            line_split = line.split('\t')
+            field_images[line_split[0]] = line_split[1]
+
+    return render_template('avg_data.html', avg_info=avg_info, responses=responses, song_scores=song_scores, heading=heading, disclaimer=disclaimer, field_images=field_images)
 
 def ms_to_m(ms):
     duration_m = ms / 60000

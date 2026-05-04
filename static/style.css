@@ -94,20 +94,21 @@ button, input, select {
 }
 
 #avg_data_container div {
+    background-color: rgba(50, 50, 50, 0.5);
     display: block;
     height: 24vw;
     max-height: 24vw;
 }
 
 #avg_data_container div img {
-    aspect-ratio: 1 1;
-    width: 30%;
-    max-width: 30%;
+    aspect-ratio: 1;
+    object-fit: contain;
+    width: 25%;
+    max-width: 25%;
     float: left;
+    margin-top: 20px;
+    margin-left: 20px;
     margin-right: 20px;
-    border-style: groove;
-    border-radius: 10px;
-    border-radius: 25px;
 }
 
 #song_scores_container {
@@ -138,7 +139,7 @@ button, input, select {
 }
 
 #song_scores_container div div img {
-    aspect-ratio: 1 1;
+    aspect-ratio: 1;
     max-height: 10vw;
     border-style: solid;
     border-width: 2px;

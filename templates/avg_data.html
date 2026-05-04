@@ -10,11 +10,11 @@
 
         <div id="data_container">
             <div id="avg_data_container">
-                <h2>Average values of your top songs</h2>
+                <h2>{{heading}}</h2>
                 {% for field in avg_info %}
                     <hr>
                     <div>
-                        <img src="https://upload.wikimedia.org/wikipedia/en/d/db/Pure_Holocaust.jpg">
+                        <img src='{{field_images[field]}}''>
                         <h3>{{field|capitalize}}: {{avg_info[field][0]}}{{avg_info[field][1]}}</h3>
                         <p>{{responses[field]}}</p>
                     </div>
@@ -41,5 +41,7 @@
                 {% endfor %}
             </div>
         </div>
+
+        <p>{{disclaimer}}</p>
     </body>
 </html>
