@@ -8,7 +8,7 @@
     <body>
         <h1>Spotipy Wrapped</h1>
 
-        <form action="/top10" method="get">
+        <form name="login" action="/top10" method="post">
             <label for="client_id">Client ID:</label>
             <input type="text" id="client_id" name="client_id" required>
             <br><br>
@@ -34,15 +34,38 @@
             </select>
             <br><br>
 
-            <input type="submit" value="Submit">
+            <input type="submit" id="submit" value="Submit">
         </form>
+
+        <p>{{msg}}</p>
+
+        <div id="loading">
+            <h1>Processing...</h1>
+            <img src="https://media2.giphy.com/media/v1.Y2lkPTZjMDliOTUya2IyeHd6ajhtYTB4ZTNidHNzeWNnMjZtbnZhZ3hpaDMxMTk3ZGluZyZlcD12MV9zdGlja2Vyc19zZWFyY2gmY3Q9cw/L05HgB2h6qICDs5Sms/200.gif">
+        </div>
     </body>
     <script>
         track_limit = document.getElementById("track_limit");
         track_limit_value = document.getElementById("track_limit_value");
-        addEventListener("input", function() {
+        submit_btn = document.getElementById("submit");
+        loading = document.getElementById("loading");
+
+        track_limit.addEventListener("input", function() {
             track_limit_value.innerText = track_limit.value;
         })
+
+        submit_btn.addEventListener("click", function() {
+            const client_id = document.forms["login"]["client_id"].value;
+            const client_secret = document.forms["login"]["client_secret"].value;
+            const redirect_uri = document.forms["login"]["redirect_uri"].value;
+
+            if (client_id == "" || client_secret == "" || redirect_uri == "") {
+
+            } else {
+                loading.style.display = "block";
+            }
+        })
+
         track_limit_value.innerText = track_limit.value;
     </script>
 </html>

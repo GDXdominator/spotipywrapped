@@ -13,6 +13,24 @@ button, input, select {
     color: rgb(225, 225, 225);
 }
 
+#loading {
+    display: none;
+    background-color: rgb(50, 50, 50);
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0px;
+    left: 0px;
+}
+
+#loading img {
+    aspect-ratio: 1 1;
+    width: 10%;
+    top: 0px;
+    left: 0px;
+    margin: auto;
+}
+
 #top10s {
     display: flex;
     margin-bottom: 10px;
@@ -60,9 +78,69 @@ button, input, select {
     padding: 10px;
 }
 
-.avg_data_container {
-    text-align: left;
-    margin-left: 20px;
-    margin-right: 20px;
+#data_container {
+    display: flex;
+    padding: 10px;
+}
+
+#data_container div {
     font-size: 1.5vw;
+}
+
+#avg_data_container {
+    width: 65%;
+    max-width: 65%;
+    text-align: left;
+}
+
+#avg_data_container div {
+    display: block;
+    height: 24vw;
+    max-height: 24vw;
+}
+
+#avg_data_container div img {
+    aspect-ratio: 1 1;
+    width: 30%;
+    max-width: 30%;
+    float: left;
+    margin-right: 20px;
+    border-style: groove;
+    border-radius: 10px;
+    border-radius: 25px;
+}
+
+#song_scores_container {
+    width: 35%;
+    max-width: 35%;
+    text-align: center;
+}
+
+#song_scores_container p {
+    font-size: 1vw;
+}
+
+#song_scores_container h4 {
+    font-size: 1.25vw;
+}
+
+#song_scores_container div {
+    display: flex;
+    height: 25vw;
+    max-height: 25vw;
+    margin-left: auto;
+    margin-right: auto;
+}
+
+#song_scores_container div div {
+    display: block;
+    width: 50%;
+}
+
+#song_scores_container div div img {
+    aspect-ratio: 1 1;
+    max-height: 10vw;
+    border-style: solid;
+    border-width: 2px;
+    border-color: rgba(75, 75, 75, 0.75);
 }

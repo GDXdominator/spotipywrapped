@@ -3,8 +3,6 @@ from flask import Flask, request, render_template
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 
-# Data saved as tsv in the event an item has ',' in its name
-# (Learned that the hard way trying to store "Tyler, the Creator")
 import csv
 import matplotlib.pyplot as plt
 import numpy as np
@@ -22,20 +20,20 @@ track_limit = 10
 
 app = Flask(__name__)
 
-@app.route('/')
+@app.route('/', methods=['GET', 'POST'])
 def home():
-    return render_template('home.html')
+    msg = ""
+    return render_template('home.html', msg=msg)
 
-@app.route('/top10', methods=['GET', 'POST'])
+@app.route('/top10', methods=['POST'])
 def top10():
     # DATA PROCESSING
+    CLIENT_ID = request.form.get('client_id')
+    CLIENT_SECRET = request.form.get('client_secret')
+    REDIRECT_URI = request.form.get('redirect_uri')
 
-    CLIENT_ID = request.args.get('client_id')
-    CLIENT_SECRET = request.args.get('client_secret')
-    REDIRECT_URI = request.args.get('redirect_uri')
-
-    time_range = request.args.get('time_range')
-    track_limit = request.args.get('track_limit')
+    track_limit = request.form.get('track_limit')
+    time_range = request.form.get('time_range')
 
     auth_manager = SpotifyOAuth(
         client_id=CLIENT_ID,
@@ -44,6 +42,10 @@ def top10():
         scope='user-top-read'
     )
     sp = spotipy.Spotify(auth_manager=auth_manager)
+    try:
+        sp.current_user()
+    except spotipy.exceptions.SpotifyOauthError:
+        return render_template('home.html', msg="Please enter valid client credentials")
 
     top_artists = sp.current_user_top_artists(limit=track_limit, time_range=time_range)['items']
     data = []
@@ -73,19 +75,35 @@ def top10():
         'popularity': 0
     }
     avg_info_units = {
-        'acousticness': '/ 1',
-        'danceability': '/ 1',
-        'energy': '/ 1',
-        'instrumentalness': '/ 1',
-        'loudness': 'db (-60 to 0)',
-        'tempo': 'bpm (0-250)',
-        'valence': '/ 1 happiness level',
-        'duration_ms': '(minutes:seconds.milliseconds)',
-        'popularity': '(0-100)'
+        'acousticness': '%',
+        'danceability': '%',
+        'energy': '%',
+        'instrumentalness': '%',
+        'loudness': ' db (-60 to 0)',
+        'tempo': ' bpm (0-250)',
+        'valence': '%',
+        'duration_ms': ' (min:sec.ms)',
+        'popularity': ' (0-100)'
     }
     years = []
     artist_appearances = {}
     top_track_artist_appearances = {}
+
+    def set_score(field, value, track):
+        track_info = [track['artists'][0]['name'] + ' - ' + track['name'], track['album']['images'][0]['url']]
+        lowest_score = song_scores[field][1]
+        highest_score = song_scores[field][3]
+
+        if value <= lowest_score:
+            song_scores[field][0] = track_info
+            song_scores[field][1] = value
+        if value >= highest_score:
+            song_scores[field][2] = track_info
+            song_scores[field][3] = value
+    song_scores = {}
+    for field in avg_info:
+        if isinstance(avg_info[field], int):
+            song_scores[field] = ["Lowest scoring song", 9999999999, "Highest scoring song", -9999999999]
 
     total_tracks_with_data = 0
     albums_with_popularity_data = 0
@@ -108,14 +126,21 @@ def top10():
         audio_features = get_audio_features(track['id'])
         if audio_features != None:
             total_tracks_with_data += 1
+
             avg_info['duration_ms'] += track['duration_ms']
+            set_score('duration_ms', track['duration_ms'], track)
+
             years.append(int(track['album']['release_date'][:4]))
             for audio_feature in audio_features:
                 if audio_feature in avg_info:
-                    avg_info[audio_feature] += audio_features[audio_feature]
+                    value = audio_features[audio_feature]
+                    avg_info[audio_feature] += value
+                    set_score(audio_feature, value, track)
         
         popularity = get_album_popularity(track['album']['id'])
         avg_info['popularity'] += popularity
+        if popularity > 0:
+            set_score('popularity', popularity, track)
         albums_with_popularity_data += 1 if popularity != 0 else 0
 
         artist = track['artists'][0]['name']
@@ -125,10 +150,20 @@ def top10():
             artist_appearances[artist] = 1
 
     for info in avg_info:
+        if total_tracks_with_data == 0:
+            break
         if info == 'popularity':
             continue
         avg_info[info] /= total_tracks_with_data
-    avg_info['popularity'] /= albums_with_popularity_data
+    if albums_with_popularity_data > 0:
+        avg_info['popularity'] /= albums_with_popularity_data
+
+    with open('data/song_scores.tsv', 'w', newline='') as file:
+        writer = csv.writer(file, delimiter='\t')
+        data = []
+        for field in song_scores:
+            data.append([field, song_scores[field][0], song_scores[field][1], song_scores[field][2], song_scores[field][3]])
+        writer.writerows(data)
 
     data = []
     for info in avg_info:
@@ -237,7 +272,7 @@ def top10():
 
     return render_template('top10.html', top_artists=top_artists, top_tracks=top_tracks)
 
-@app.route('/avg_data')
+@app.route('/avg_data', methods=['POST'])
 def avg_data():
     avg_info = {}
     with open('data/avg_data.tsv', 'r') as file:
@@ -313,7 +348,7 @@ def avg_data():
     elif tempo < 109:
         responses['tempo'] = "Your top songs are fairly slow"
     elif tempo < 120:
-        responses['tempo'] = "Your top songs are at a fairly normal tempo"
+        responses['tempo'] = "Your top songs are at a moderately upbeat tempo"
     elif tempo < 158:
         responses['tempo'] = "Your top songs are fairly upbeat and fast!"
     elif tempo < 180:
@@ -392,19 +427,74 @@ def avg_data():
             if year >= era[0] and year <= era[1]:
                 eras[era] += 1
     most_listened_era = max(eras, key=eras.get)
-    avg_info['years'] = [f"{most_listened_era[0]} - {most_listened_era[1]}", "period"]
+    avg_info['years'] = [f"{most_listened_era[0]} - {most_listened_era[1]}", " period"]
     responses['years'] = eras_responses[most_listened_era]
 
-    seconds = np.round((duration_m % 1) * 60, 2)
-    avg_info['duration_m'] = [str(int(duration_m)) + ":" + str(seconds), avg_info['duration_ms'][1]]
-    avg_info.pop('duration_ms')
+    avg_info['duration_m'] = [ms_to_m(avg_info['duration_ms'][0]), ' ' + avg_info['duration_ms'][1]]
 
     for info in avg_info:
         value = avg_info[info][0]
-        if isinstance(value, float):
-            avg_info[info][0] = float(np.round(value, 3))
+        unit = avg_info[info][1]
+        
+        if unit == '%\n':
+            value *= 100
 
-    return render_template('avg_data.html', avg_info=avg_info, responses=responses)
+        if isinstance(value, float):
+            avg_info[info][0] = float(np.round(value, 2))
+
+    song_scores = {}
+    score_adjectives = {
+        'acousticness': ("Least acoustic", "Most acoustic"),
+        'danceability': ("Least danceable", "Most danceable"),
+        'energy': ("Least energetic", "Most energetic"),
+        'instrumentalness': ("Most vocals", "Most instrumental"),
+        'loudness': ("Quietest song", "Loudest song"),
+        'tempo': ("Slowest song", "Fastest song"),
+        'valence': ("Least happy", "Brightest"),
+        'duration_ms': ("Shortest song", "Longest song"),
+        'popularity': ("Least popular", "Most popular")
+    }
+    with open('data/song_scores.tsv', 'r') as file:
+        for line in file:
+            line_split = line.split('\t')
+            field = line_split[0]
+            if line_split[1][0] != '"':
+                low_score_track_info = eval(line_split[1])
+            else: # weird bug where tracks w/ apostrophes get formatted in the tsv like "[""track name"", ...]"
+                low_score_track_info = eval(line_split[1].strip('"').replace('""', '"'))
+            low_score = line_split[2]
+            if line_split[3][0] != '"':
+                high_score_track_info = eval(line_split[3])
+            else:
+                high_score_track_info = eval(line_split[3].strip('"').replace('""', '"'))
+            high_score = line_split[4]
+
+            unit = avg_info[field][1]
+
+            if unit == '%\n':
+                low_score = float(low_score) * 100
+                high_score = float(high_score) * 100
+            elif field == 'duration_ms':
+                low_score = ms_to_m(float(low_score))
+                high_score = ms_to_m(float(high_score))
+
+            if isinstance(low_score, float):
+                low_score = str(float(np.round(low_score, 2)))
+                high_score = str(float(np.round(high_score, 2)))
+            
+            low_score += unit
+            high_score += unit
+
+            song_scores[field] = [low_score_track_info, low_score, high_score_track_info, high_score, score_adjectives[field]]
+    
+    avg_info.pop('duration_ms')
+
+    return render_template('avg_data.html', avg_info=avg_info, responses=responses, song_scores=song_scores)
+
+def ms_to_m(ms):
+    duration_m = ms / 60000
+    seconds = np.round((duration_m % 1) * 60, 2)
+    return str(int(duration_m)) + ':' + str(seconds)
 
 def get_audio_features(id):
     url = "https://api.reccobeats.com/v1/audio-features?ids=" + id
