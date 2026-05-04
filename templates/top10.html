@@ -20,6 +20,16 @@
             </div>
 
             <div class="bar top10">
+                <h2>Your Top {{(top_albums|length, 10)|min}} Albums</h2>
+                {% for i in range(0, (top_albums|length, 10)|min) %}
+                    <div>
+                        <p>{{i + 1}}. {{top_albums[i][0]}}</p>
+                        <img src={{top_albums[i][1]}}>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="bar top10">
                 <h2>Your Top {{(top_tracks|length, 10)|min}} Songs</h2>
                 {% for i in range(0, (top_tracks|length, 10)|min) %}
                     <div>

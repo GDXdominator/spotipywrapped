@@ -46,6 +46,8 @@ def top10():
         sp.current_user()
     except spotipy.exceptions.SpotifyOauthError:
         return render_template('home.html', msg="Please enter valid client credentials")
+    
+    print("Client authorized")
 
     top_artists = sp.current_user_top_artists(limit=track_limit, time_range=time_range)['items']
     data = []
@@ -55,6 +57,8 @@ def top10():
         writer = csv.writer(file, delimiter='\t')
         writer.writerows(data)
 
+    print("top_artists.tsv written")
+
     top_tracks = sp.current_user_top_tracks(limit=track_limit, time_range=time_range)['items']
     data = []
     for track in top_tracks:
@@ -62,6 +66,8 @@ def top10():
     with open('data/top_tracks.tsv', 'w', newline='') as file:
         writer = csv.writer(file, delimiter='\t')
         writer.writerows(data)
+
+    print("top_tracks.tsv written")
     
     avg_info = {
         'acousticness': 0,
@@ -88,6 +94,7 @@ def top10():
     years = []
     artist_appearances = {}
     top_track_artist_appearances = {}
+    album_appearances = {}
 
     def set_score(field, value, track):
         track_info = [track['artists'][0]['name'] + ' - ' + track['name'], track['album']['images'][0]['url']]
@@ -112,15 +119,35 @@ def top10():
     saved_tracks = sp.current_user_saved_tracks(limit=track_limit)['items']
     all_tracks = []
 
+    print("Current user's top and saved tracks gathered")
+
     for track_item in saved_tracks:
         all_tracks.append(track_item['track'])
     for track in top_tracks:
         all_tracks.append(track)
+
         artist = track['artists'][0]['name']
         if artist in top_track_artist_appearances:
             top_track_artist_appearances[artist] += 1
         else:
             top_track_artist_appearances[artist] = 1
+
+        album = track['album']
+        str_rep = artist + ' - ' + album['name']
+        if str_rep in album_appearances:
+            album_appearances[str_rep][0] += 1
+        else:
+            album_appearances[str_rep] = [1, album['images'][0]['url']]
+
+    sorted_dict = {key: val for key, val in sorted(album_appearances.items(), key=lambda item: item[1][0], reverse=True)}
+    data = []
+    for album in sorted_dict:
+        data.append([album, sorted_dict[album][1]])
+    with open('data/top_albums.tsv', 'w', newline='') as file:
+        writer = csv.writer(file, delimiter='\t')
+        writer.writerows(data)
+
+    print("top_albums.tsv written")
 
     for track in all_tracks:
         audio_features = get_audio_features(track['id'])
@@ -136,6 +163,8 @@ def top10():
                     value = audio_features[audio_feature]
                     avg_info[audio_feature] += value
                     set_score(audio_feature, value, track)
+
+            print(f"Gathered audio features of {total_tracks_with_data}/{len(all_tracks)} songs")
         
         popularity = get_album_popularity(track['album']['id'])
         avg_info['popularity'] += popularity
@@ -158,12 +187,7 @@ def top10():
     if albums_with_popularity_data > 0:
         avg_info['popularity'] /= albums_with_popularity_data
 
-    with open('data/song_scores.tsv', 'w', newline='') as file:
-        writer = csv.writer(file, delimiter='\t')
-        data = []
-        for field in song_scores:
-            data.append([field, song_scores[field][0], song_scores[field][1], song_scores[field][2], song_scores[field][3]])
-        writer.writerows(data)
+    print("Average song values gathered")
 
     data = []
     for info in avg_info:
@@ -172,9 +196,13 @@ def top10():
         writer = csv.writer(file, delimiter='\t')
         writer.writerows(data)
 
+    print("avg_data.tsv written")
+
     with open('data/years_listened.txt', 'w') as file:
         for year in years:
             file.write(str(year) + '\n')
+    
+    print("years_listened.txt written")
 
     with open('data/artist_appearances.tsv', 'w', newline='') as file:
         data = []
@@ -187,6 +215,17 @@ def top10():
         fieldnames = ["Artist", "Top Songs/Likes Appearances", "Top Songs Appearances"]
         writer = csv.DictWriter(file, fieldnames=fieldnames, delimiter='\t')
         writer.writerows(data)
+
+    print("artist_appearances.tsv written")
+
+    with open('data/song_scores.tsv', 'w', newline='') as file:
+        writer = csv.writer(file, delimiter='\t')
+        data = []
+        for field in song_scores:
+            data.append([field, song_scores[field][0], song_scores[field][1], song_scores[field][2], song_scores[field][3]])
+        writer.writerows(data)
+    
+    print("song_scores.tsv written")
     
     # DATA GATHERING
 
@@ -207,6 +246,12 @@ def top10():
         for line in file:
             line_split = line.split('\t')
             top_tracks.append(line_split)
+
+    top_albums = []
+    with open('data/top_albums.tsv') as file:
+        for line in file:
+            line_split = line.split('\t')
+            top_albums.append(line_split)
 
     labels = []
     sizes = []
@@ -270,7 +315,7 @@ def top10():
     title.set_color('white')
     plt.savefig('static/chart2.png', transparent=True)
 
-    return render_template('top10.html', top_artists=top_artists, top_tracks=top_tracks)
+    return render_template('top10.html', top_artists=top_artists, top_albums=top_albums, top_tracks=top_tracks)
 
 @app.route('/avg_data', methods=['POST'])
 def avg_data():
