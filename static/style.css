@@ -6,6 +6,13 @@ body {
     font-size: 1.15w;
 }
 
+button, input, select {
+    background-color: rgba(100, 100, 100, 0.75);
+    border-style: groove;
+    border-radius: 10px;
+    color: rgb(225, 225, 225);
+}
+
 #top10s {
     display: flex;
     margin-bottom: 10px;
@@ -41,6 +48,8 @@ body {
 }
 
 #piecharts {
+    max-width: 60%;
+    align-items: center;
     margin-left: auto;
     margin-right: auto;
 }
@@ -49,4 +58,11 @@ body {
     background-color: rgba(50, 50, 50, 0.5);
     border-radius: 25px;
     padding: 10px;
+}
+
+.avg_data_container {
+    text-align: left;
+    margin-left: 20px;
+    margin-right: 20px;
+    font-size: 1.5vw;
 }

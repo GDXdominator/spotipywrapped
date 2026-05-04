@@ -14,10 +14,10 @@
             <br><br>
 
             <label for="client_secret">Client Secret:</label>
-            <input type="text" id="client_secret" name="client_secret" required>
+            <input type="password" id="client_secret" name="client_secret" required>
             <br><br>
 
-            <label for="client_secret">Redirect URI:</label>
+            <label for="redirect_uri">Redirect URI:</label>
             <input type="text" id="redirect_uri" name="redirect_uri" required>
             <br><br>
 
@@ -40,7 +40,7 @@
     <script>
         track_limit = document.getElementById("track_limit");
         track_limit_value = document.getElementById("track_limit_value");
-        addEventListener("change", function() {
+        addEventListener("input", function() {
             track_limit_value.innerText = track_limit.value;
         })
         track_limit_value.innerText = track_limit.value;

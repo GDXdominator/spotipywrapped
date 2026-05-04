@@ -70,7 +70,18 @@ def top10():
         'tempo': 0,
         'valence': 0,
         'duration_ms': 0,
-        'popularity': 0,
+        'popularity': 0
+    }
+    avg_info_units = {
+        'acousticness': '/ 1',
+        'danceability': '/ 1',
+        'energy': '/ 1',
+        'instrumentalness': '/ 1',
+        'loudness': 'db (-60 to 0)',
+        'tempo': 'bpm (0-250)',
+        'valence': '/ 1 happiness level',
+        'duration_ms': '(minutes:seconds.milliseconds)',
+        'popularity': '(0-100)'
     }
     years = []
     artist_appearances = {}
@@ -119,10 +130,12 @@ def top10():
         avg_info[info] /= total_tracks_with_data
     avg_info['popularity'] /= albums_with_popularity_data
 
+    data = []
+    for info in avg_info:
+        data.append([info, avg_info[info], avg_info_units[info]])
     with open('data/avg_data.tsv', 'w', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=list(avg_info.keys()), delimiter='\t')
-        writer.writeheader()
-        writer.writerows([avg_info])
+        writer = csv.writer(file, delimiter='\t')
+        writer.writerows(data)
 
     with open('data/years_listened.txt', 'w') as file:
         for year in years:
@@ -199,6 +212,8 @@ def top10():
     labels = []
     sizes = []
     for info in artist_appearances:
+        if int(info[2]) == 0:
+            continue
         sizes.append(int(info[2]))
         labels.append(info[0])
     greatest_slice = max(sizes)
@@ -225,19 +240,22 @@ def top10():
 @app.route('/avg_data')
 def avg_data():
     avg_info = {}
-    with open('data/avg_data.txt', 'r') as file:
+    with open('data/avg_data.tsv', 'r') as file:
         for line in file:
             line_split = line.split('\t')
-            avg_info[line_split[0]] = float(line_split[1])
+            field = line_split[0]
+            value = line_split[1]
+            units = line_split[2]
+            avg_info[field] = [float(value), units]
 
     years = []
-    with open('data/years.txt', 'r') as file:
+    with open('data/years_listened.txt', 'r') as file:
         for line in file:
             years.append(int(line))
 
     responses = {}
 
-    acousticness = avg_info['acousticness']
+    acousticness = avg_info['acousticness'][0]
     if acousticness < 0.5:
         responses['acousticness'] = "You seem to like music with electronic, digital, or amplified elements the best!"
     elif acousticness < 0.8:
@@ -245,9 +263,9 @@ def avg_data():
     else:
         responses['acousticness'] = "Seems you have a preference for purely acoustic music!"
 
-    danceability = avg_info['danceability']
+    danceability = avg_info['danceability'][0]
     if danceability < 0.4:
-        responses['danceability'] = "Your songs seems hard to dance to..."
+        responses['danceability'] = "Your songs seem hard to dance to..."
     elif danceability < 0.65:
         responses['danceability'] = "If you try very hard, you <i>might</i> be able to dance to your songs..."
     elif danceability < 0.8:
@@ -255,7 +273,7 @@ def avg_data():
     else:
         responses['danceability'] = "Your songs were made to be danced to!"
 
-    energy = avg_info['energy']
+    energy = avg_info['energy'][0]
     if energy < 0.3:
         responses['energy'] = "You don't seem to be the energetic type"
     elif energy < 0.55:
@@ -265,7 +283,7 @@ def avg_data():
     else:
         responses['energy'] = "Your music is very energetic!"
 
-    instrumentalness = avg_info['instrumentalness']
+    instrumentalness = avg_info['instrumentalness'][0]
     if instrumentalness < 0.3:
         responses['instrumentalness'] = "Either you're fan of clear rap or big on singing. You love to be able to hear vocals!"
     elif instrumentalness < 0.5:
@@ -275,7 +293,7 @@ def avg_data():
     else:
         responses['instrumentalness'] = "You much prefer instrumental music. Instruments over the voice!"
 
-    loudness = avg_info['loudness']
+    loudness = avg_info['loudness'][0]
     if loudness < -25:
         responses['loudness'] = "Your music is very quiet... Perhaps a fan of ambient or calming music?"
     elif loudness < -15:
@@ -287,9 +305,9 @@ def avg_data():
     elif loudness < -5:
         responses['loudness'] = "You like it loud!! Most likely a rock, metal, or EDM fan!"
     else:
-        responses['loudness'] = "You like it really loud!!! Most definitely a fan of metal, hardcore EDM, or maybe even noise music!"
+        responses['loudness'] = "You like it really loud!!! Most definitely a fan of metal, hardcore EDM, or other loud genres!"
 
-    tempo = avg_info['tempo']
+    tempo = avg_info['tempo'][0]
     if tempo < 60:
         responses['tempo'] = "Most of your top songs are slower than a clock ticking!"
     elif tempo < 109:
@@ -303,13 +321,13 @@ def avg_data():
     else:
         responses['tempo'] = "You like your songs really fast!"
 
+    valence = avg_info['valence'][0]
     time_range_responses = {
         "short_term": "The past week has been ",
         "medium_term": "The past 6 months have been ",
         "long_term": "The past year has been "
     }
     time_range_response = time_range_responses[time_range]
-    valence = avg_info['valence']
     if valence < 0.25:
         responses['valence'] = time_range_response + "very unkind to you. Whatever emotions your top songs have, they definitely aren't happiness"
     elif valence < 0.5:
@@ -319,7 +337,7 @@ def avg_data():
     else:
         responses['valence'] = time_range_response + "pretty good! Your top songs seem to be pretty happy and positive"
 
-    duration_m = avg_info['duration_ms'] / 60000
+    duration_m = avg_info['duration_ms'][0] / 60000
     if duration_m < 1.5:
         responses['duration_m'] = "Most of your favorite tracks aren't even a minute long... You are absolutely a grindcore fan or are listening to sound effects."
     elif duration_m < 4.5:
@@ -327,25 +345,21 @@ def avg_data():
     elif duration_m < 8:
         responses['duration_m'] = "You like long songs, but not too long, I see"
     elif duration_m < 12:
-        responses['duration_m'] = "Your in for the long run!"
+        responses['duration_m'] = "You're in for the long run!"
     else:
         responses['duration_m'] = "Your music must send you in a trance if they go on for this long..."
 
-    popularity = avg_info['popularity']
-    if popularity < 0.1:
+    popularity = avg_info['popularity'][0]
+    if popularity < 10:
         responses['popularity'] = "You are deep underground, no one knows your songs!"
-    elif popularity < 0.25:
+    elif popularity < 25:
         responses['popularity'] = "Most of your music is quite underground"
-    elif popularity < 0.5:
+    elif popularity < 50:
         responses['popularity'] = "Your top songs may be popular in specific spaces, but not quite mainstream"
-    elif popularity < 0.8:
+    elif popularity < 80:
         responses['popularity'] = "Your top songs are popular, but not mainstream!"
     else:
         responses['popularity'] = "Your top songs are known by the masses!"
-
-    for info in avg_info:
-        avg_info[info] = float(np.round(avg_info[info]), 3)
-        info.capitalize()
 
     eras = {
         (0, 1919): 0,
@@ -378,10 +392,19 @@ def avg_data():
             if year >= era[0] and year <= era[1]:
                 eras[era] += 1
     most_listened_era = max(eras, key=eras.get)
-    avg_info['Most Listened Era'] = f"{most_listened_era[0] - most_listened_era[1]}"
+    avg_info['years'] = [f"{most_listened_era[0]} - {most_listened_era[1]}", "period"]
     responses['years'] = eras_responses[most_listened_era]
 
-    render_template('avg_data.html', avg_info=avg_info, responses=responses)
+    seconds = np.round((duration_m % 1) * 60, 2)
+    avg_info['duration_m'] = [str(int(duration_m)) + ":" + str(seconds), avg_info['duration_ms'][1]]
+    avg_info.pop('duration_ms')
+
+    for info in avg_info:
+        value = avg_info[info][0]
+        if isinstance(value, float):
+            avg_info[info][0] = float(np.round(value, 3))
+
+    return render_template('avg_data.html', avg_info=avg_info, responses=responses)
 
 def get_audio_features(id):
     url = "https://api.reccobeats.com/v1/audio-features?ids=" + id
@@ -404,4 +427,4 @@ def get_album_popularity(id):
     return popularity[0]['popularity']
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(threaded=True, debug=True)

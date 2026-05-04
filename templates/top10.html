@@ -31,15 +31,28 @@
         </div>
 
         <div id="piecharts">
-            <img class="bar" src="/static/chart1.png">
-            <img class="bar" src="/static/chart2.png">
+            <button id="chart_btn">Exclude Liked Songs</button>
+            <img id="chart" class="bar" src="/static/chart1.png">
         </div>
 
-        <button id="to_avg_data">Next</button>
-        <script>
-            document.getElementById("to_avg_data").addEventListener("click", function() {
-                window.location.href = "templates/avg_data.html"
-            })
-        </script>
+        <form action="/avg_data">
+            <input type="submit" value="Next">
+        </form>
     </body>
+    <script>
+        const chartImg = document.getElementById("chart");
+        const btn = document.getElementById("chart_btn");
+        var chart1 = true;
+
+        btn.addEventListener("click", function() {
+            if (chart1) {
+                chartImg.src = "static/chart2.png";
+                btn.innerText = "Include Liked Songs";
+            } else {
+                chartImg.src = "static/chart1.png";
+                btn.innerText = "Exclude Liked Songs";
+            }
+            chart1 = !chart1;
+        })
+    </script>
 </html>
