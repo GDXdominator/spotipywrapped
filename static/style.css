@@ -1,5 +1,11 @@
 body {
     background-color: rgb(25, 25, 25);
+    background-image: url(/static/bgweegee.gif);
+    background-size: 100% 100%;
+    background-attachment: fixed;
+    height: 100vh;
+    padding: 0;
+    margin: 0;
     color: whitesmoke;
     text-align: center;
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -7,7 +13,7 @@ body {
 }
 
 button, input, select {
-    background-color: rgba(100, 100, 100, 0.75);
+    background-color: rgba(100, 100, 100, 0.5);
     border-style: groove;
     border-radius: 10px;
     color: rgb(225, 225, 225);
@@ -41,10 +47,10 @@ button, input, select {
 }
 
 .bar {
-    background-color: rgba(50, 50, 50, 0.5);
+    background-color: rgba(50, 50, 50, 0.25);
     border-style: solid;
     border-width: 2.5px;
-    border-color: rgba(100, 100, 100, 0.75);
+    border-color: rgba(100, 100, 100, 0.5);
     border-radius: 25px;
     padding-left: 10px;
     padding-right: 10px;
@@ -78,12 +84,12 @@ button, input, select {
     padding: 10px;
 }
 
-#data_container {
+.data_container {
     display: flex;
     padding: 10px;
 }
 
-#data_container div {
+.data_container div {
     font-size: 1.5vw;
 }
 
@@ -94,10 +100,11 @@ button, input, select {
 }
 
 #avg_data_container div {
-    background-color: rgba(50, 50, 50, 0.5);
+    background-color: rgba(50, 50, 50, 0.25);
     display: block;
     height: 24vw;
     max-height: 24vw;
+    border-radius: 20px;
 }
 
 #avg_data_container div img {

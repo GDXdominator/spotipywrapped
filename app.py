@@ -9,6 +9,9 @@ import numpy as np
 
 import requests, json
 
+from bs4 import BeautifulSoup
+from requests_html import HTMLSession
+
 recco_base = "https://api.reccobeats.com/v1/"
 recco_payload = {}
 recco_headers = {
@@ -26,7 +29,7 @@ def home():
 def top10():
     CLIENT_ID = request.form.get('client_id')
     CLIENT_SECRET = request.form.get('client_secret')
-    REDIRECT_URI = request.form.get('redirect_uri')
+    REDIRECT_URI = "https://spotipywrapped.onrender.com/callback"
 
     track_limit = request.form.get('track_limit')
     time_range = request.form.get('time_range')
@@ -41,17 +44,18 @@ def top10():
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         redirect_uri=REDIRECT_URI,
-        scope='user-top-read'
+        scope='user-top-read user-library-read'
     )
     sp = spotipy.Spotify(auth_manager=auth_manager)
+
     try:
-        sp.current_user()
-    except spotipy.exceptions.SpotifyOauthError:
+        top_artists = sp.current_user_top_artists(limit=track_limit, time_range=time_range)['items']
+    except spotipy.exceptions.SpotifyOauthError as e:
+        print(e)
         return render_template('home.html', msg="Please enter valid client credentials")
     
     print("Client authorized")
 
-    top_artists = sp.current_user_top_artists(limit=track_limit, time_range=time_range)['items']
     data = []
     for artist in top_artists:
         data.append([artist['name'], artist['images'][0]['url']])
@@ -159,7 +163,9 @@ def top10():
 
     print("top_albums.tsv written")
 
+    i = 0
     for track in all_tracks_no_dupes:
+        i += 1
         audio_features = get_audio_features(track['id'])
         if (track in all_tracks_no_dupes and include_liked) or track in top_tracks:
             if audio_features != None:
@@ -189,7 +195,7 @@ def top10():
         else:
             artist_appearances[artist] = 1
         
-        print(f"Gathered audio features of {total_tracks_with_data}/{len(all_tracks_no_dupes)} songs")
+        print(f"Gathered audio features of {i}/{len(all_tracks_no_dupes)} songs")
 
     avg_data_filters['total_tracks_with_data'] = total_tracks_with_data
     with open('data/avg_data_filters.json', 'w') as file:
@@ -518,7 +524,7 @@ def avg_data():
         'acousticness': ("Least acoustic", "Most acoustic"),
         'danceability': ("Least danceable", "Most danceable"),
         'energy': ("Least energetic", "Most energetic"),
-        'instrumentalness': ("Most vocals", "Most instrumental"),
+        'instrumentalness': ("Most vocal", "Most instrumental"),
         'loudness': ("Quietest song", "Loudest song"),
         'tempo': ("Slowest song", "Fastest song"),
         'valence': ("Least happy", "Brightest"),
@@ -576,6 +582,43 @@ def avg_data():
             field_images[line_split[0]] = line_split[1]
 
     return render_template('avg_data.html', avg_info=avg_info, responses=responses, song_scores=song_scores, heading=heading, disclaimer=disclaimer, field_images=field_images)
+
+@app.route('/mainstream_test', methods=['POST'])
+def mainstream_test():
+    common_artists = []
+
+    top_artists = []
+    names = []
+    with open('data/top_artists.tsv', 'r') as file:
+        for line in file:
+            line_split = line.split('\t')
+            top_artists.append([line_split[0], line_split[1]])
+            names.append(line_split[0])
+
+    session = HTMLSession()
+    response = session.get('https://spotifystats.com/top-artists')
+    html_text = response.html.raw_html
+    soup = BeautifulSoup(html_text, "html.parser")
+
+    table = soup.find('table', class_='w-full text-sm text-left text-gray-100')
+    tbody = table.find('tbody')
+
+    spotify_top_artists = []
+    for tr in tbody.find_all('tr'):
+        if tr['class'][1] == 'sm:table-row':
+            continue
+        td = tr.find('td')
+        div = td.find('div')
+        da_info = div.find('div')
+        artist_name = da_info.find_all('div')[2].find('a').string.strip()
+        artist_image = da_info.find_all('div')[1].find('img')['src']
+
+        if artist_name in names:
+            common_artists.append([artist_name, artist_image])
+
+        spotify_top_artists.append([artist_name, artist_image])
+
+    return render_template('mainstream_test.html', spotify_top_artists=spotify_top_artists, common_artists=common_artists, top_artists=top_artists)
 
 def ms_to_m(ms):
     duration_m = ms / 60000

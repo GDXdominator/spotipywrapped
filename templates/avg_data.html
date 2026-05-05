@@ -8,7 +8,7 @@
     <body>
         <h1>Your Music Taste</h1>
 
-        <div id="data_container">
+        <div class="data_container">
             <div id="avg_data_container">
                 <h2>{{heading}}</h2>
                 {% for field in avg_info %}
@@ -43,5 +43,9 @@
         </div>
 
         <p>{{disclaimer}}</p>
+
+        <form action="/mainstream_test" method="post">
+            <input type="submit" value="Next">
+        </form>
     </body>
 </html>
