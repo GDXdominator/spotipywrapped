@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Your Taste Vs. The World's</title>
+        <meta name="description" content="Shows you how your top artists compare to Spotify's top artists">
+        <link href="/static/style.css" rel="stylesheet" type="text/css" media="all">
+    </head>
+    <body>
+        <h1>Your Taste Vs. The World's</h1>
+
+        <div id="top10s">
+            <div class="bar top10">
+                <h2>Your Top Artists</h2>
+                {% for i in range(0, top_artists|length) %}
+                    <div>
+                        <p>{{i + 1}}. {{top_artists[i][0]}}</p>
+                        <img src={{top_artists[i][1]}}>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="bar top10">
+                <h2>Artists in Common</h2>
+                {% for i in range(0, (top_tracks|length, 10)|min) %}
+                    <div>
+                        <p>{{i + 1}}. {{top_tracks[i][0]}}</p>
+                        <img src={{top_tracks[i][1]}}>
+                    </div>
+                {% endfor %}
+                {% if top_tracks|length == 0 %}
+                    <p>You don't listen to any top artists!</p>
+                {% endif %}
+            </div>
+
+            <div class="bar top10">
+                <h2>The World's Top Artists</h2>
+                {% for i in range(0, spotify_top_artists|length) %}
+                    <div>
+                        <p>{{i + 1}}. {{spotify_top_artists[i][0]}}</p>
+                        <img src={{spotify_top_artists[i][1]}}>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </body>
+</html>
