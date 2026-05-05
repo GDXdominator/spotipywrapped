@@ -1,0 +1,8 @@
+flask
+gunicorn
+spotipy
+matplotlib
+numpy
+requests
+bs4
+requests_html
